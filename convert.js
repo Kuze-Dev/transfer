@@ -1,4 +1,5 @@
 const fs = require("fs")
+const path = require("path")
 
 function generateSlug(text) {
   if (!text || typeof text !== "string") {
@@ -16,7 +17,7 @@ function generateSlug(text) {
 
 function escapeCSVField(field) {
   if (field === null || field === undefined) {
-    return "NULL"
+    return ""
   }
 
   const str = String(field)
@@ -26,80 +27,65 @@ function escapeCSVField(field) {
   return str
 }
 
-function convertJsonToCsvAdvanced() {
+function convertToCustomCSV() {
   try {
-    if (!fs.existsSync("../data/properties.json")) {
-      console.error("❌ properties.json file not found!")
-      process.exit(1)
+    const inputPath = path.join(__dirname, "../data/properties.json")
+    const outputPath = path.join(__dirname, "../data/content_entries.csv")
+
+    if (!fs.existsSync(inputPath)) {
+      console.error("❌ properties.json not found!")
+      return
     }
 
-    const jsonData = JSON.parse(fs.readFileSync("../data/properties.json", "utf8"))
-
-    // Complete headers matching the required structure
+    const jsonData = JSON.parse(fs.readFileSync(inputPath, "utf8"))
     const headers = [
-      "id",
-      "author_id",
-      "content_id",
+      "content",
       "title",
-      "slug",
+      "route_url",
       "published_at",
       "data",
-      "order",
-      "created_at",
-      "updated_at",
-      "locale",
-      "draftable_id",
       "status",
-      "translation_id",
+      "locale",
+      "sites",
+      "taxonomy_terms"
     ]
 
-    const csvRows = [headers.join(",")]
-    const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ")
+    const rows = [headers.join(",")]
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
 
-    jsonData.forEach((property, index) => {
-      const propertyName = property.information?.property_name || `Property ${index + 1}`
-      const contentId = `PR-${String(index + 1).padStart(4, "0")}`
-      const slug = generateSlug(propertyName)
-
-      console.log(`Processing: "${propertyName}" -> slug: "${slug}"`) // Debug log
+    jsonData.forEach((item, index) => {
+      const title = item.information?.property_code || `Property ${index + 1}`
+      const slug = generateSlug(title)
+      const routeUrl = `/property/${slug}`
+      const status = item.information?.status === "Active" ? 1 : 0
 
       const row = [
-        index + 1, // id
-        1, // author_id
-        escapeCSVField(contentId), // content_id
-        escapeCSVField(propertyName), // title
-        escapeCSVField(slug), // slug
-        currentDate, // published_at
-        escapeCSVField(JSON.stringify(property)), // data
-        index + 1, // order
-        currentDate, // created_at
-        currentDate, // updated_at
-        "en", // locale
-        "NULL", // draftable_id
-        property.information?.status === "active" ? 1 : 0, // status
-        "NULL", // translation_id
+        "properties", // content type
+        escapeCSVField(title),
+        "", // escapeCSVField(routeUrl),
+        "",// escapeCSVField(currentDate),
+        escapeCSVField(JSON.stringify(item)),
+        status,
+        "en",
+        "", // sites
+        ""  // taxonomy_terms
       ]
 
-      csvRows.push(row.join(","))
+      rows.push(row.join(","))
     })
 
-    fs.writeFileSync("content-entries.csv", csvRows.join("\n"))
-    console.log("✅ Advanced conversion completed!")
-    console.log(`📊 Processed ${jsonData.length} properties`)
-    console.log("📁 Output: content-entries.csv")
+    fs.writeFileSync(outputPath, rows.join("\n"))
+    console.log("✅ CSV generated successfully!")
+    console.log("📁 Output file:", outputPath)
 
-    // Show sample of generated slugs
-    console.log("\n🔗 Sample slugs generated:")
-    jsonData.slice(0, 5).forEach((property, index) => {
-      const title = property.information?.property_name || `Property ${index + 1}`
-      const slug = generateSlug(title)
-      console.log(`  "${title}" -> "${slug}"`)
-    })
-  } catch (error) {
-    console.error("❌ Error:", error.message)
-    console.error("Stack trace:", error.stack)
+  } catch (err) {
+    console.error("❌ Error generating CSV:", err.message)
   }
 }
 
-// Run the advanced conversion
-convertJsonToCsvAdvanced()
+// Run the converter
+convertToCustomCSV()
